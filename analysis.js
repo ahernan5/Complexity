@@ -47,10 +47,10 @@ function FunctionBuilder()
 		   (
 		   	"{0}(): {1}\n" +
 		   	"============\n" +
-			   "SimpleCyclomaticComplexity: {2}\t" +
-				"MaxNestingDepth: {3}\t" +
-				"MaxConditions: {4}\t" +
-				"Parameters: {5}\n\n"
+			"SimpleCyclomaticComplexity: {2}\t" +
+			"MaxNestingDepth: {3}\t" +
+			"MaxConditions: {4}\t" +
+			"Parameters: {5}\n\n"
 			)
 			.format(this.FunctionName, this.StartLine,
 				     this.SimpleCyclomaticComplexity, this.MaxNestingDepth,
@@ -75,7 +75,7 @@ function FileBuilder()
 			  "~~~~~~~~~~~~\n"+
 			  "ImportCount {1}\t" +
 			  "Strings {2}\n"
-			).format( this.FileName, this.ImportCount, this.Strings ));
+			).format( this.FileName, this.ImportCount, this.Strings));
 	}
 }
 
@@ -93,10 +93,24 @@ function traverseWithParents(object, visitor)
             if (typeof child === 'object' && child !== null && key != 'parent') 
             {
             	child.parent = object;
-					traverseWithParents(child, visitor);
+				traverseWithParents(child, visitor);
             }
         }
     }
+}
+
+function decisionCounter(node) {
+	let max = 0;
+	let IfStatement = false;
+	traverseWithParents(node, function (node) {
+
+		if (node.type === "LogicalExpression" && (node.operator === "&&" || node.operator === "||"))
+			max++;
+		else if (node.type === "IfStatement")
+			max = 1;
+	});
+
+	return max;
 }
 
 function complexity(filePath)
@@ -112,7 +126,7 @@ function complexity(filePath)
 	fileBuilder.ImportCount = 0;
 	builders[filePath] = fileBuilder;
 
-	// Tranverse program with a function visitor.
+	// Tranverse program with a function visitor.  Work on this 
 	traverseWithParents(ast, function (node) 
 	{
 		if (node.type === 'FunctionDeclaration') 
@@ -120,13 +134,28 @@ function complexity(filePath)
 			var builder = new FunctionBuilder();
 
 			builder.FunctionName = functionName(node);
-			builder.StartLine    = node.loc.start.line;
-
+			builder.ParameterCount = node.params.length;
 			builders[builder.FunctionName] = builder;
+			builder.StartLine = node.loc.start.line;
+			let max = 0;
+			traverseWithParents(node, function (node) {
+				if (isDecision(node)) {
+					builder.SimpleCyclomaticComplexity += 1;
+					if (decisionCounter(node) > max) {
+						max = decisionCounter(node);
+					}
+				}
+			});
+			builder.MaxConditions = max;
+		}
+		if (node.type === 'Literal') {
+			fileBuilder.Strings += 1;
+
 		}
 
 	});
 
+	strings = fileBuilder.Strings;
 }
 
 // Helper function for counting children of node.
@@ -203,7 +232,7 @@ function Crazy (argument)
       {
           var mints = secs / 60;
           var remainder = parseInt(secs.toString().split(".")[0]) -
-(parseInt(mints.toString().split(".")[0]) * 60);
+				(parseInt(mints.toString().split(".")[0]) * 60);
           var szmin;
           if ( mints > 1 )
           {
@@ -214,16 +243,16 @@ function Crazy (argument)
               szmin = "minute";
           }
           return mints.toString().split(".")[0] + " " + szmin + " " +
-remainder.toString() + " seconds";
+				remainder.toString() + " seconds";
       }
       else
       {
           var mints = secs / 60;
           var hours = mints / 60;
           var remainders = parseInt(secs.toString().split(".")[0]) -
-(parseInt(mints.toString().split(".")[0]) * 60);
+				(parseInt(mints.toString().split(".")[0]) * 60);
           var remainderm = parseInt(mints.toString().split(".")[0]) -
-(parseInt(hours.toString().split(".")[0]) * 60);
+				(parseInt(hours.toString().split(".")[0]) * 60);
           var szmin;
           if ( remainderm > 1 )
           {
@@ -272,7 +301,14 @@ remainder.toString() + " seconds";
 				  return;
           }
           return hours.toString().split(".")[0] + " " + szhr + " " +
-mints.toString().split(".")[0] + " " + szmin;
+				mints.toString().split(".")[0] + " " + szmin;
       }
-  }
- exports.complexity = complexity;
+}
+var strings = 0;
+function getStrings() {
+	return strings;
+
+}
+
+exports.getStrings = getStrings;
+exports.complexity = complexity;
